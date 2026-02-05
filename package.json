@@ -13,7 +13,7 @@
   "scripts": {
     "start": "node bin/hoot.js",
     "dev": "vite",
-    "server": "node server/server-node.js",
+    "server": "node --use-system-ca server/server-node.js",
     "server:worker": "source .env 2>/dev/null || true && wrangler dev",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "dev:worker": "concurrently \"npm run server:worker\" \"npm run dev\"",

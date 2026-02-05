@@ -46,7 +46,8 @@ console.log('📡 Starting server on port 8008...');
 const backend = spawn('node', [join(rootDir, 'server/server-node.js')], {
     cwd: rootDir,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, NODE_ENV: 'production' }
+    env: { ...process.env, NODE_ENV: 'production' },
+    shell: process.platform === 'win32'
 });
 
 processes.push(backend);
@@ -126,7 +127,8 @@ setTimeout(async () => {
             ...process.env,
             // Ensure npm modules are in PATH
             PATH: `${join(rootDir, 'node_modules', '.bin')}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`
-        }
+        },
+        shell: process.platform === 'win32'
     });
 
     processes.push(frontend);

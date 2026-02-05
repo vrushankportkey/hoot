@@ -279,6 +279,35 @@ export async function autoDetectServer({ url }) {
     } catch (error) {
       logger.verbose(`${transport.toUpperCase()} failed:`, error.message);
 
+      // Check for Zod-like validation errors (array of errors)
+      if (Array.isArray(error) && error.length > 0 && error[0].code) {
+        logger.error(`Validation error detected for ${transport}:`, JSON.stringify(error, null, 2));
+
+        // If it looks like an OAuth metadata invalid error, try to fetch the metadata manually to debug
+        try {
+          // Construct well-known URL based on the server URL
+          const urlObj = new URL(url);
+          // If the path ends with /mcp (common convention), we should look at the root or relative to it
+          // RFC 9728 says .well-known should be at the host root or path root
+
+          // Try fetching metadata manually to show what's wrong
+          const wellKnownUrl = new URL('/.well-known/oauth-protected-resource', urlObj.origin);
+          logger.info(`🔍 Debugging validation error - fetching metadata from ${wellKnownUrl}`);
+
+          const metaRes = await fetch(wellKnownUrl.toString());
+          if (metaRes.ok) {
+            const meta = await metaRes.json();
+            logger.error(`📋 Raw Metadata that failed validation:`, JSON.stringify(meta, null, 2));
+          }
+        } catch (debugError) {
+          logger.error(`Failed to debug metadata: ${debugError.message}`);
+        }
+
+        lastError = new Error(`Metadata validation failed: ${JSON.stringify(error)}`);
+        continue;
+      }
+
+
       const isOAuthError = error.name === 'UnauthorizedError' && error.authorizationUrl;
       const is401or403 = error.message && (error.message.includes('401') || error.message.includes('403'));
 
@@ -493,6 +522,28 @@ export async function connectToServer(options) {
   try {
     await client.connect(mcpTransport);
   } catch (connectError) {
+    // Check for Zod-like validation errors (array of errors)
+    if (Array.isArray(connectError) && connectError.length > 0 && connectError[0].code) {
+      logger.error(`Validation error detected during connection for ${serverName}:`, JSON.stringify(connectError, null, 2));
+
+      // If it looks like an OAuth metadata invalid error, try to fetch the metadata manually to debug
+      try {
+        const urlObj = new URL(url);
+        const wellKnownUrl = new URL('/.well-known/oauth-protected-resource', urlObj.origin);
+        logger.info(`🔍 Debugging validation error - fetching metadata from ${wellKnownUrl}`);
+
+        const metaRes = await fetch(wellKnownUrl.toString());
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          logger.error(`📋 Raw Metadata that failed validation:`, JSON.stringify(meta, null, 2));
+        }
+      } catch (debugError) {
+        logger.error(`Failed to debug metadata: ${debugError.message}`);
+      }
+
+      throw new Error(`Metadata validation failed: ${JSON.stringify(connectError)}`);
+    }
+
     // Log error concisely (full error details are too verbose)
     logger.error(`client.connect() failed for ${serverName}:`, connectError.message);
     throw connectError;
